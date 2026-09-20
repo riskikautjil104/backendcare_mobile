@@ -140,16 +140,67 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'pin' => 'required|string|size:6',
+            'identifier' => 'nullable|string',
+            'phone' => 'nullable|string',
+            'phone_number' => 'nullable|string',
         ]);
 
-        $user = $request->user();
+        $pin = $validated['pin'];
+        $user = auth('sanctum')->user() ?? $request->user();
+
+        if (! $user) {
+            $identifier = trim(
+                $validated['identifier']
+                ?? $validated['phone']
+                ?? $validated['phone_number']
+                ?? ''
+            );
+
+            if (! empty($identifier)) {
+                $cleanPhone = preg_replace('/[^0-9]/', '', $identifier);
+                $candidates = [$identifier];
+                if (str_starts_with($cleanPhone, '62')) {
+                    $candidates[] = '0' . substr($cleanPhone, 2);
+                    $candidates[] = substr($cleanPhone, 2);
+                } elseif (str_starts_with($cleanPhone, '0')) {
+                    $candidates[] = substr($cleanPhone, 1);
+                    $candidates[] = '62' . substr($cleanPhone, 1);
+                } else {
+                    $candidates[] = '0' . $cleanPhone;
+                    $candidates[] = '62' . $cleanPhone;
+                }
+
+                $user = User::whereIn('phone_number', $candidates)
+                    ->orWhere('email', $identifier)
+                    ->first();
+            }
+        }
+
+        if (! $user) {
+            return response()->json([
+                'status' => 'error',
+                'error' => 'UNAUTHENTICATED',
+                'message' => 'Sesi autentikasi tidak ditemukan. Silakan masukkan nomor handphone Anda.',
+            ], 401);
+        }
+
         $user->update([
-            'pin_hash' => Hash::make($validated['pin']),
+            'pin_hash' => Hash::make($pin),
         ]);
+
+        $token = $user->createToken('mobile_patient_token')->plainTextToken;
 
         return response()->json([
             'status' => 'success',
             'message' => 'PIN keamanan berhasil disimpan.',
+            'data' => [
+                'token' => $token,
+                'has_pin' => true,
+                'has_registered_patient' => (bool) $user->has_registered_patient,
+                'no_rm' => $user->no_rm,
+                'nama_pasien' => $user->nama_pasien,
+                'user' => $user,
+            ],
         ]);
     }
 

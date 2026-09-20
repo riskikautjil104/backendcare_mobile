@@ -15,11 +15,11 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
     Route::post('/auth/login-pin', [AuthController::class, 'loginPin']);
+    Route::post('/auth/set-pin', [AuthController::class, 'setPin']);
 
     // Authenticated Patient Routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
-        Route::post('/auth/set-pin', [AuthController::class, 'setPin']);
         Route::post('/user/patient-profile', [AuthController::class, 'updatePatientProfile']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
 
