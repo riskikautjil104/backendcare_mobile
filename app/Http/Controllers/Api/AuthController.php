@@ -160,14 +160,28 @@ class AuthController extends Controller
             'pin' => 'required|string|size:6',
         ]);
 
-        $identifier = $validated['identifier'];
+        $identifier = trim($validated['identifier']);
         $pin = $validated['pin'];
 
-        $user = User::where('phone_number', $identifier)
+        // Normalize variations (e.g. 08123..., 8123..., 628123..., +628123...)
+        $cleanPhone = preg_replace('/[^0-9]/', '', $identifier);
+        $candidates = [$identifier];
+        if (str_starts_with($cleanPhone, '62')) {
+            $candidates[] = '0' . substr($cleanPhone, 2);
+            $candidates[] = substr($cleanPhone, 2);
+        } elseif (str_starts_with($cleanPhone, '0')) {
+            $candidates[] = substr($cleanPhone, 1);
+            $candidates[] = '62' . substr($cleanPhone, 1);
+        } else {
+            $candidates[] = '0' . $cleanPhone;
+            $candidates[] = '62' . $cleanPhone;
+        }
+
+        $user = User::whereIn('phone_number', $candidates)
             ->orWhere('email', $identifier)
             ->first();
 
-        if (! $user || ! Hash::check($pin, $user->pin_hash)) {
+        if (! $user || empty($user->pin_hash) || ! Hash::check($pin, $user->pin_hash)) {
             if ($user) {
                 LoginLog::create([
                     'user_id' => $user->id,
@@ -182,7 +196,9 @@ class AuthController extends Controller
             return response()->json([
                 'status' => 'error',
                 'error' => 'INVALID_PIN',
-                'message' => 'Nomor handphone atau PIN yang dimasukkan salah.',
+                'message' => empty($user?->pin_hash) 
+                    ? 'Akun ini belum memiliki PIN. Silakan masuk dengan kode OTP terlebih dahulu.'
+                    : 'Nomor handphone atau PIN yang dimasukkan salah.',
             ], 401);
         }
 
