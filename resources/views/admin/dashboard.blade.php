@@ -11,7 +11,7 @@
     </div>
 
     <!-- Metric Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Pasien Terdaftar</div>
             <div class="text-3xl font-extrabold text-slate-900 mt-2">{{ number_format($totalPatients) }}</div>
@@ -34,6 +34,78 @@
             <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Aktivitas Login Hari Ini</div>
             <div class="text-3xl font-extrabold text-indigo-700 mt-2">{{ number_format($todayLogins) }}</div>
             <div class="text-xs text-slate-500 font-semibold mt-1">Sesi Terdeteksi & Tercatat</div>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">OTP Email Aktif</div>
+            <div class="text-3xl font-extrabold text-amber-700 mt-2">{{ number_format($activeOtpCount) }}</div>
+            <div class="text-xs text-slate-500 font-semibold mt-1">Belum digunakan & belum kedaluwarsa</div>
+        </div>
+    </div>
+
+    <!-- OTP Email Terbaru untuk Mode Testing -->
+    <div class="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+        <div class="px-6 py-5 border-b border-amber-100 bg-amber-50/60 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-bold text-slate-900">Kode OTP Email Terbaru</h3>
+                <p class="text-xs text-amber-700 mt-0.5">Panel sementara untuk testing sebelum SMTP Brevo aktif penuh. Gunakan hanya oleh Super Admin.</p>
+            </div>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-3 py-1 rounded-full">Testing Mode</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-600">
+                <thead class="bg-slate-50 text-xs text-slate-400 uppercase font-semibold border-b border-slate-200">
+                    <tr>
+                        <th class="px-6 py-3.5">Tujuan / Identifier</th>
+                        <th class="px-6 py-3.5">Kode OTP</th>
+                        <th class="px-6 py-3.5">Tipe</th>
+                        <th class="px-6 py-3.5">Status</th>
+                        <th class="px-6 py-3.5">Dibuat</th>
+                        <th class="px-6 py-3.5">Kedaluwarsa</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium">
+                    @forelse($recentOtps as $otp)
+                        @php
+                            $isExpired = $otp->expires_at && $otp->expires_at->isPast();
+                            $maskedIdentifier = strlen($otp->identifier) > 6
+                                ? substr($otp->identifier, 0, 3) . str_repeat('*', max(strlen($otp->identifier) - 6, 0)) . substr($otp->identifier, -3)
+                                : $otp->identifier;
+                        @endphp
+                        <tr class="hover:bg-slate-50/80 transition">
+                            <td class="px-6 py-4">
+                                <div class="font-mono text-xs font-bold text-slate-800">{{ $maskedIdentifier }}</div>
+                                <div class="text-[11px] text-slate-400">ID OTP #{{ $otp->id }}</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="font-mono text-lg font-extrabold tracking-[0.35em] text-slate-900 bg-slate-100 px-3 py-1.5 rounded-lg">{{ $otp->otp_code }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-xs">
+                                <span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full font-semibold">{{ $otp->type }}</span>
+                            </td>
+                            <td class="px-6 py-4">
+                                @if($otp->is_used)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Sudah Dipakai</span>
+                                @elseif($isExpired)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800">Kedaluwarsa</span>
+                                @else
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">Aktif</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">
+                                {{ $otp->created_at ? $otp->created_at->setTimezone('Asia/Jayapura')->format('d M Y, H:i:s') : '-' }} WIT
+                            </td>
+                            <td class="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">
+                                {{ $otp->expires_at ? $otp->expires_at->setTimezone('Asia/Jayapura')->format('d M Y, H:i:s') : '-' }} WIT
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-slate-400 text-xs">Belum ada kode OTP yang dibuat.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 
