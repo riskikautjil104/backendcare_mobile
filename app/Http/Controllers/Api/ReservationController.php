@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\UserReservation;
 use Illuminate\Http\Request;
 
@@ -10,8 +11,14 @@ class ReservationController extends Controller
 {
     public function index(Request $request)
     {
-        $reservations = $request->user()
-            ->reservations()
+        $user = $request->user();
+        $userIds = User::query()
+            ->whereIn('phone_number', $this->phoneCandidates($user->phone_number))
+            ->orWhere('email', $user->email)
+            ->pluck('id');
+
+        $reservations = UserReservation::query()
+            ->whereIn('user_id', $userIds)
             ->latest('tanggal_praktik')
             ->get();
 
@@ -19,6 +26,30 @@ class ReservationController extends Controller
             'status' => 'success',
             'data' => $reservations,
         ]);
+    }
+
+    private function phoneCandidates(?string $phone): array
+    {
+        $phone = trim((string) $phone);
+        if ($phone === '') {
+            return [];
+        }
+
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+        $candidates = [$phone, $cleanPhone];
+
+        if (str_starts_with($cleanPhone, '62')) {
+            $candidates[] = '0'.substr($cleanPhone, 2);
+            $candidates[] = substr($cleanPhone, 2);
+        } elseif (str_starts_with($cleanPhone, '0')) {
+            $candidates[] = substr($cleanPhone, 1);
+            $candidates[] = '62'.substr($cleanPhone, 1);
+        } else {
+            $candidates[] = '0'.$cleanPhone;
+            $candidates[] = '62'.$cleanPhone;
+        }
+
+        return array_values(array_unique(array_filter($candidates)));
     }
 
     public function store(Request $request)
@@ -39,7 +70,7 @@ class ReservationController extends Controller
             'status_antrean' => 'nullable|string',
         ]);
 
-        if (!empty($validated['estimasi_kedatangan']) && strlen($validated['estimasi_kedatangan']) > 150) {
+        if (! empty($validated['estimasi_kedatangan']) && strlen($validated['estimasi_kedatangan']) > 150) {
             $validated['estimasi_kedatangan'] = substr($validated['estimasi_kedatangan'], 0, 150);
         }
 
@@ -62,7 +93,7 @@ class ReservationController extends Controller
             ->where('kode_booking', $kode)
             ->first();
 
-        if (!$reservation) {
+        if (! $reservation) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Tiket reservasi tidak ditemukan dalam akun Anda.',
